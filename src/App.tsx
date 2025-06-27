@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import SalesPage from './pages/SalesPage';
 import ExpensesPage from './pages/ExpensesPage';
 import InventoryPage from './pages/InventoryPage';
+import InventoryValuationPage from './pages/InventoryValuationPage';
 import ReportsPage from './pages/ReportsPage';
 import AccountsPage from './pages/AccountsPage';
 import FinancialStatementsPage from './pages/FinancialStatementsPage';
@@ -26,6 +27,7 @@ function App() {
               <Route path="/sales" element={<SalesPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/inventory-valuation" element={<InventoryValuationPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/financial-statements" element={<FinancialStatementsPage />} />

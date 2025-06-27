@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, AlertTriangle, Package, Edit3, Trash2 } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Package, Edit3, Trash2, Calculator } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useBusiness } from '../contexts/BusinessContext';
 import Layout from '../components/Layout/Layout';
 import Card from '../components/UI/Card';
@@ -127,10 +128,18 @@ const InventoryPage: React.FC = () => {
             <p className="text-gray-600">Manage your products and stock levels</p>
           </motion.div>
 
-          <Button onClick={() => setShowNewProductModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Link to="/inventory-valuation">
+              <Button variant="outline">
+                <Calculator className="mr-2 h-4 w-4" />
+                Valuation
+              </Button>
+            </Link>
+            <Button onClick={() => setShowNewProductModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Product
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -196,12 +205,53 @@ const InventoryPage: React.FC = () => {
           </motion.div>
         </div>
 
+        {/* Advanced Inventory Features */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="mb-8"
+        >
+          <Card>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Advanced Inventory Features</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Link to="/inventory-valuation">
+                <div className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors cursor-pointer">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <Calculator className="h-6 w-6 text-primary-600" />
+                    <h4 className="font-semibold text-gray-900">Inventory Valuation</h4>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    FIFO and Weighted Average costing methods for accurate inventory valuation
+                  </p>
+                  <div className="mt-2">
+                    <Badge variant="primary" size="sm">Advanced</Badge>
+                  </div>
+                </div>
+              </Link>
+              
+              <div className="p-4 border border-gray-200 rounded-lg opacity-50">
+                <div className="flex items-center space-x-3 mb-2">
+                  <Package className="h-6 w-6 text-gray-400" />
+                  <h4 className="font-semibold text-gray-500">Batch Tracking</h4>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Track inventory by batches with expiration dates (Coming Soon)
+                </p>
+                <div className="mt-2">
+                  <Badge variant="neutral" size="sm">Coming Soon</Badge>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
         {/* Low Stock Alert */}
         {lowStockProducts.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.5 }}
             className="mb-8"
           >
             <Card>
@@ -234,7 +284,7 @@ const InventoryPage: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.6 }}
         >
           <Card>
             <div className="flex items-center justify-between mb-6">

@@ -284,6 +284,76 @@ export interface Database {
           created_at?: string;
         };
       };
+      inventory_movements: {
+        Row: {
+          id: string;
+          product_id: string;
+          movement_type: 'purchase' | 'sale' | 'adjustment' | 'transfer';
+          quantity: number;
+          unit_cost: number;
+          total_cost: number;
+          reference_id: string | null;
+          date: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          movement_type: 'purchase' | 'sale' | 'adjustment' | 'transfer';
+          quantity: number;
+          unit_cost?: number;
+          total_cost?: number;
+          reference_id?: string | null;
+          date?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          movement_type?: 'purchase' | 'sale' | 'adjustment' | 'transfer';
+          quantity?: number;
+          unit_cost?: number;
+          total_cost?: number;
+          reference_id?: string | null;
+          date?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+      };
+      inventory_layers: {
+        Row: {
+          id: string;
+          product_id: string;
+          quantity: number;
+          unit_cost: number;
+          total_cost: number;
+          purchase_date: string;
+          remaining_quantity: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          quantity: number;
+          unit_cost: number;
+          total_cost: number;
+          purchase_date: string;
+          remaining_quantity: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          quantity?: number;
+          unit_cost?: number;
+          total_cost?: number;
+          purchase_date?: string;
+          remaining_quantity?: number;
+          created_at?: string;
+        };
+      };
     };
   };
 }
