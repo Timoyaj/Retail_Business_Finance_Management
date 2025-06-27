@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { accountsService } from './accounts';
 import type { Database } from './supabase';
 
 // Type aliases for easier use
@@ -146,6 +147,14 @@ class DatabaseService {
 
     if (error) {
       throw new Error(error.message);
+    }
+
+    // Initialize default chart of accounts for the new business
+    try {
+      await accountsService.initializeDefaultAccounts(data.id, businessData.type || 'general');
+    } catch (accountError) {
+      console.error('Error initializing chart of accounts:', accountError);
+      // Don't throw error here as business creation was successful
     }
 
     return data;

@@ -6,6 +6,7 @@ import {
   CreditCard,
   Package,
   FileText,
+  Building,
   Settings,
   LogOut,
   User
@@ -19,6 +20,7 @@ const navigationItems = [
   { name: 'Expenses', href: '/expenses', icon: CreditCard },
   { name: 'Inventory', href: '/inventory', icon: Package },
   { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Accounts', href: '/accounts', icon: Building },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

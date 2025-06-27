@@ -185,6 +185,105 @@ export interface Database {
           created_at?: string;
         };
       };
+      account_types: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          normal_balance: 'debit' | 'credit';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          normal_balance: 'debit' | 'credit';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          normal_balance?: 'debit' | 'credit';
+          created_at?: string;
+        };
+      };
+      accounts: {
+        Row: {
+          id: string;
+          business_id: string;
+          account_type_id: string;
+          code: string;
+          name: string;
+          description: string | null;
+          parent_account_id: string | null;
+          is_active: boolean;
+          is_system: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          account_type_id: string;
+          code: string;
+          name: string;
+          description?: string | null;
+          parent_account_id?: string | null;
+          is_active?: boolean;
+          is_system?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          account_type_id?: string;
+          code?: string;
+          name?: string;
+          description?: string | null;
+          parent_account_id?: string | null;
+          is_active?: boolean;
+          is_system?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      account_balances: {
+        Row: {
+          id: string;
+          account_id: string;
+          period_start: string;
+          period_end: string;
+          opening_balance: number;
+          closing_balance: number;
+          total_debits: number;
+          total_credits: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          account_id: string;
+          period_start: string;
+          period_end: string;
+          opening_balance?: number;
+          closing_balance?: number;
+          total_debits?: number;
+          total_credits?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          account_id?: string;
+          period_start?: string;
+          period_end?: string;
+          opening_balance?: number;
+          closing_balance?: number;
+          total_debits?: number;
+          total_credits?: number;
+          created_at?: string;
+        };
+      };
     };
   };
 }
