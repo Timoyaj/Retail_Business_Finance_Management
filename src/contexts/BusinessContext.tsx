@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { db, BusinessProfile, Product, Transaction } from '../lib/database';
 import { useAuth } from './AuthContext';
+import { useRealtimeTransactions, useRealtimeProducts } from '../hooks/useRealtimeData';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+import { useOptimisticUpdates } from '../hooks/useOptimisticUpdates';
+import { useOfflineSync } from '../hooks/useOfflineSync';
 
 export interface BusinessContextType {
   profile: BusinessProfile | null;
   transactions: Transaction[];
   products: Product[];
   isLoading: boolean;
+  error: string | null;
   updateProfile: (profile: Partial<BusinessProfile>, userId?: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'business_id' | 'created_at'>) => Promise<void>;
   addProduct: (product: Omit<Product, 'id' | 'business_id' | 'created_at' | 'updated_at'>) => Promise<void>;
@@ -19,6 +24,8 @@ export interface BusinessContextType {
     inventoryValue: number;
   };
   refreshData: () => Promise<void>;
+  clearError: () => void;
+  retryLastAction: () => Promise<void>;
 }
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
@@ -38,9 +45,59 @@ interface BusinessProviderProps {
 export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { handleError, error, clearError, retry } = useErrorHandler();
+  const { queueAction } = useOfflineSync();
+
+  // Use real-time data hooks
+  const {
+    data: realtimeTransactions,
+    isLoading: transactionsLoading,
+    error: transactionsError
+  } = useRealtimeTransactions(profile?.id || '');
+
+  const {
+    data: realtimeProducts,
+    isLoading: productsLoading,
+    error: productsError
+  } = useRealtimeProducts(profile?.id || '');
+
+  // Use optimistic updates for better UX
+  const {
+    data: transactions,
+    setData: setTransactions,
+    addOptimisticUpdate: addOptimisticTransaction,
+    isPending: isTransactionPending
+  } = useOptimisticUpdates<Transaction>(realtimeTransactions);
+
+  const {
+    data: products,
+    setData: setProducts,
+    addOptimisticUpdate: addOptimisticProduct,
+    isPending: isProductPending
+  } = useOptimisticUpdates<Product>(realtimeProducts);
+
+  // Update local state when real-time data changes
+  useEffect(() => {
+    setTransactions(realtimeTransactions);
+  }, [realtimeTransactions, setTransactions]);
+
+  useEffect(() => {
+    setProducts(realtimeProducts);
+  }, [realtimeProducts, setProducts]);
+
+  // Handle real-time errors
+  useEffect(() => {
+    if (transactionsError) {
+      handleError(transactionsError);
+    }
+  }, [transactionsError, handleError]);
+
+  useEffect(() => {
+    if (productsError) {
+      handleError(productsError);
+    }
+  }, [productsError, handleError]);
 
   // Load business data when user changes
   useEffect(() => {
@@ -62,19 +119,8 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
       // Load business profile
       const businessProfile = await db.getBusinessByUserId(user.id);
       setProfile(businessProfile);
-
-      if (businessProfile) {
-        // Load transactions and products
-        const [businessTransactions, businessProducts] = await Promise.all([
-          db.getTransactionsByBusinessId(businessProfile.id),
-          db.getProductsByBusinessId(businessProfile.id),
-        ]);
-
-        setTransactions(businessTransactions);
-        setProducts(businessProducts);
-      }
-    } catch (error) {
-      console.error('Error loading business data:', error);
+    } catch (err) {
+      handleError(err as Error);
     } finally {
       setIsLoading(false);
     }
@@ -87,72 +133,128 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
       throw new Error('User not authenticated');
     }
 
-    if (!profile) {
-      // Create new business profile if it doesn't exist
-      const newProfile = await db.createBusiness({
-        user_id: currentUserId,
-        name: profileUpdate.name || 'My Business',
-        type: profileUpdate.type || 'general',
-        currency: profileUpdate.currency || 'NGN',
-        theme: profileUpdate.theme || 'light',
-        accent_color: profileUpdate.accent_color || 'primary',
-      });
-      
-      setProfile(newProfile);
-      
-      // Initialize sample data for new business
-      await db.initializeSampleData(newProfile.id);
-      
-      // Refresh data to show sample data
-      await refreshData();
-    } else {
-      // Update existing profile
-      const updatedProfile = await db.updateBusiness(profile.id, profileUpdate);
-      setProfile(updatedProfile);
+    try {
+      if (!profile) {
+        // Create new business profile if it doesn't exist
+        const newProfile = await db.createBusiness({
+          user_id: currentUserId,
+          name: profileUpdate.name || 'My Business',
+          type: profileUpdate.type || 'general',
+          currency: profileUpdate.currency || 'NGN',
+          theme: profileUpdate.theme || 'light',
+          accent_color: profileUpdate.accent_color || 'primary',
+        });
+        
+        setProfile(newProfile);
+        
+        // Initialize sample data for new business
+        await db.initializeSampleData(newProfile.id);
+      } else {
+        // Update existing profile
+        const updatedProfile = await db.updateBusiness(profile.id, profileUpdate);
+        setProfile(updatedProfile);
+      }
+    } catch (err) {
+      handleError(err as Error);
+      throw err;
     }
   };
 
   const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'business_id' | 'created_at'>) => {
     if (!profile) throw new Error('Business profile not found');
 
-    const newTransaction = await db.createTransaction({
-      ...transactionData,
+    const tempTransaction: Transaction = {
+      id: `temp_${Date.now()}`,
       business_id: profile.id,
+      created_at: new Date().toISOString(),
+      ...transactionData,
+    };
+
+    // Add optimistic update
+    addOptimisticTransaction('create', tempTransaction, async () => {
+      try {
+        const newTransaction = await db.createTransaction({
+          ...transactionData,
+          business_id: profile.id,
+        });
+        return newTransaction;
+      } catch (err) {
+        // Queue for offline sync if network error
+        if (!navigator.onLine) {
+          queueAction('create', 'transactions', {
+            ...transactionData,
+            business_id: profile.id,
+          });
+        }
+        throw err;
+      }
     });
-
-    setTransactions(prev => [newTransaction, ...prev]);
-
-    // Update product stock if it's a sale
-    if (transactionData.type === 'sale') {
-      // This is a simplified approach - in a real app, you'd track which products were sold
-      // For now, we'll just refresh the data
-      await refreshData();
-    }
   };
 
   const addProduct = async (productData: Omit<Product, 'id' | 'business_id' | 'created_at' | 'updated_at'>) => {
     if (!profile) throw new Error('Business profile not found');
 
-    const newProduct = await db.createProduct({
-      ...productData,
+    const tempProduct: Product = {
+      id: `temp_${Date.now()}`,
       business_id: profile.id,
-    });
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...productData,
+    };
 
-    setProducts(prev => [...prev, newProduct]);
+    addOptimisticProduct('create', tempProduct, async () => {
+      try {
+        const newProduct = await db.createProduct({
+          ...productData,
+          business_id: profile.id,
+        });
+        return newProduct;
+      } catch (err) {
+        if (!navigator.onLine) {
+          queueAction('create', 'products', {
+            ...productData,
+            business_id: profile.id,
+          });
+        }
+        throw err;
+      }
+    });
   };
 
   const updateProduct = async (id: string, productUpdate: Partial<Product>) => {
-    const updatedProduct = await db.updateProduct(id, productUpdate);
-    setProducts(prev => 
-      prev.map(product => 
-        product.id === id ? updatedProduct : product
-      )
-    );
+    const existingProduct = products.find(p => p.id === id);
+    if (!existingProduct) throw new Error('Product not found');
+
+    const updatedProduct = { ...existingProduct, ...productUpdate };
+
+    addOptimisticProduct('update', updatedProduct, async () => {
+      try {
+        const result = await db.updateProduct(id, productUpdate);
+        return result;
+      } catch (err) {
+        if (!navigator.onLine) {
+          queueAction('update', 'products', { id, ...productUpdate });
+        }
+        throw err;
+      }
+    });
   };
 
   const deleteProduct = async (id: string) => {
-    await db.deleteProduct(id);
-    setProducts(prev => prev.filter(product => product.id !== id));
+    const existingProduct = products.find(p => p.id === id);
+    if (!existingProduct) throw new Error('Product not found');
+
+    addOptimisticProduct('delete', existingProduct, async () => {
+      try {
+        await db.deleteProduct(id);
+        return existingProduct;
+      } catch (err) {
+        if (!navigator.onLine) {
+          queueAction('delete', 'products', { id });
+        }
+        throw err;
+      }
+    });
   };
 
   const getFinancialSummary = () => {
@@ -177,11 +279,16 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     await loadBusinessData();
   };
 
+  const retryLastAction = async () => {
+    return retry(loadBusinessData);
+  };
+
   const value = {
     profile,
     transactions,
     products,
-    isLoading,
+    isLoading: isLoading || transactionsLoading || productsLoading,
+    error: error?.message || null,
     updateProfile,
     addTransaction,
     addProduct,
@@ -189,6 +296,8 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     deleteProduct,
     getFinancialSummary,
     refreshData,
+    clearError,
+    retryLastAction,
   };
 
   return <BusinessContext.Provider value={value}>{children}</BusinessContext.Provider>;
