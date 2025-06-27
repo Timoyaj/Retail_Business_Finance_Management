@@ -1,11 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  businessId?: string;
-}
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { localDB, User } from '../lib/database';
 
 interface AuthContextType {
   user: User | null;
@@ -13,6 +7,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,47 +26,75 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const currentUser = localDB.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error('Error checking existing session:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkExistingSession();
+  }, []);
 
   const login = async (email: string, password: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const mockUser: User = {
-      id: '1',
-      email,
-      name: 'Demo User',
-      businessId: 'business-1'
-    };
-    
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    setIsLoading(true);
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // For demo purposes, we'll accept any password for existing users
+      // In production, this would verify against a hashed password
+      const existingUser = await localDB.getUserByEmail(email);
+      
+      if (!existingUser) {
+        throw new Error('User not found. Please check your email or register for a new account.');
+      }
+      
+      setUser(existingUser);
+      localDB.setCurrentUser(existingUser);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const register = async (email: string, password: string, name: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const mockUser: User = {
-      id: '1',
-      email,
-      name,
-    };
-    
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    setIsLoading(true);
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const newUser = await localDB.createUser({
+        email,
+        name,
+      });
+      
+      setUser(newUser);
+      localDB.setCurrentUser(newUser);
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
+    localDB.clearCurrentUser();
   };
-
-  React.useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
 
   const value = {
     user,
@@ -79,6 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     isAuthenticated: !!user,
+    isLoading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

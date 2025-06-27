@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   TrendingUp, 
@@ -19,81 +19,12 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const { profile, transactions, products, getFinancialSummary, addTransaction, addProduct } = useBusiness();
-
-  // Initialize with sample data if empty
-  useEffect(() => {
-    if (transactions.length === 0) {
-      // Add sample transactions
-      const sampleTransactions = [
-        {
-          type: 'sale' as const,
-          amount: 15000,
-          description: 'T-shirt sales',
-          category: 'Clothing',
-          paymentMethod: 'Cash',
-          date: new Date(Date.now() - 1000 * 60 * 60 * 24),
-          status: 'completed' as const,
-        },
-        {
-          type: 'sale' as const,
-          amount: 25000,
-          description: 'Jeans and accessories',
-          category: 'Clothing',
-          paymentMethod: 'Card',
-          date: new Date(),
-          status: 'completed' as const,
-        },
-        {
-          type: 'expense' as const,
-          amount: 5000,
-          description: 'Electricity bill',
-          category: 'Utilities',
-          date: new Date(Date.now() - 1000 * 60 * 60 * 48),
-          status: 'completed' as const,
-        },
-      ];
-
-      sampleTransactions.forEach(transaction => {
-        addTransaction(transaction);
-      });
-    }
-
-    if (products.length === 0) {
-      // Add sample products
-      const sampleProducts = [
-        {
-          name: 'Cotton T-Shirt',
-          sku: 'TS001',
-          category: 'Clothing',
-          costPrice: 2500,
-          sellingPrice: 5000,
-          currentStock: 50,
-          lowStockThreshold: 10,
-          description: 'Comfortable cotton t-shirt in various colors',
-        },
-        {
-          name: 'Denim Jeans',
-          sku: 'DJ001',
-          category: 'Clothing',
-          costPrice: 8000,
-          sellingPrice: 15000,
-          currentStock: 5,
-          lowStockThreshold: 10,
-          description: 'Premium denim jeans',
-        },
-      ];
-
-      sampleProducts.forEach(product => {
-        addProduct(product);
-      });
-    }
-  }, [addTransaction, addProduct, transactions.length, products.length]);
+  const { profile, transactions, products, getFinancialSummary, isLoading } = useBusiness();
 
   const financialSummary = getFinancialSummary();
-  const lowStockProducts = products.filter(p => p.currentStock <= p.lowStockThreshold);
+  const lowStockProducts = products.filter(p => p.current_stock <= p.low_stock_threshold);
 
-  // Sample data for charts
+  // Sample data for charts (in a real app, this would be calculated from actual data)
   const salesData = [
     { name: 'Mon', sales: 12000, expenses: 4000 },
     { name: 'Tue', sales: 18000, expenses: 6000 },
@@ -146,29 +77,26 @@ const DashboardPage: React.FC = () => {
     },
   ];
 
-  const recentActivities = [
-    {
-      id: '1',
-      type: 'sale',
-      description: 'Sale of ₦25,000 - Jeans and accessories',
-      time: '2 minutes ago',
-      amount: 25000,
-    },
-    {
-      id: '2',
-      type: 'expense',
-      description: 'Paid electricity bill',
-      time: '1 hour ago',
-      amount: -5000,
-    },
-    {
-      id: '3',
-      type: 'inventory',
-      description: 'Stock updated for Cotton T-Shirt',
-      time: '3 hours ago',
-      amount: 0,
-    },
-  ];
+  const recentActivities = transactions.slice(0, 5).map(transaction => ({
+    id: transaction.id,
+    type: transaction.type,
+    description: transaction.description,
+    time: new Date(transaction.created_at).toLocaleTimeString(),
+    amount: transaction.type === 'expense' ? -transaction.amount : transaction.amount,
+  }));
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="p-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading your business data...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -316,39 +244,45 @@ const DashboardPage: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      activity.type === 'sale' ? 'bg-green-100' :
-                      activity.type === 'expense' ? 'bg-red-100' : 'bg-blue-100'
-                    }`}>
-                      {activity.type === 'sale' ? (
-                        <ShoppingCart className="h-5 w-5 text-green-600" />
-                      ) : activity.type === 'expense' ? (
-                        <DollarSign className="h-5 w-5 text-red-600" />
-                      ) : (
-                        <Package className="h-5 w-5 text-blue-600" />
+                {recentActivities.length > 0 ? (
+                  recentActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        activity.type === 'sale' ? 'bg-green-100' :
+                        activity.type === 'expense' ? 'bg-red-100' : 'bg-blue-100'
+                      }`}>
+                        {activity.type === 'sale' ? (
+                          <ShoppingCart className="h-5 w-5 text-green-600" />
+                        ) : activity.type === 'expense' ? (
+                          <DollarSign className="h-5 w-5 text-red-600" />
+                        ) : (
+                          <Package className="h-5 w-5 text-blue-600" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">
+                          {activity.description}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {activity.time}
+                        </p>
+                      </div>
+                      
+                      {activity.amount !== 0 && (
+                        <div className={`text-sm font-semibold ${
+                          activity.amount > 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {activity.amount > 0 ? '+' : ''}₦{Math.abs(activity.amount).toLocaleString()}
+                        </div>
                       )}
                     </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {activity.description}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {activity.time}
-                      </p>
-                    </div>
-                    
-                    {activity.amount !== 0 && (
-                      <div className={`text-sm font-semibold ${
-                        activity.amount > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {activity.amount > 0 ? '+' : ''}₦{Math.abs(activity.amount).toLocaleString()}
-                      </div>
-                    )}
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No recent activities. Start by adding a sale or expense!</p>
                   </div>
-                ))}
+                )}
               </div>
             </Card>
           </motion.div>
@@ -374,7 +308,7 @@ const DashboardPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-gray-900">{product.name}</p>
                         <p className="text-xs text-gray-500">
-                          {product.currentStock} units left
+                          {product.current_stock} units left
                         </p>
                       </div>
                       <Badge variant="warning" size="sm">
@@ -394,25 +328,27 @@ const DashboardPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-600">Today's Sales</span>
+                    <span className="text-sm text-gray-600">Total Products</span>
                   </div>
-                  <span className="font-semibold text-green-600">₦25,000</span>
+                  <span className="font-semibold text-blue-600">{products.length}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Users className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-600">Customers Served</span>
+                    <span className="text-sm text-gray-600">Total Transactions</span>
                   </div>
-                  <span className="font-semibold text-blue-600">28</span>
+                  <span className="font-semibold text-green-600">{transactions.length}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Target className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-600">Monthly Goal</span>
+                    <span className="text-sm text-gray-600">Business Type</span>
                   </div>
-                  <span className="font-semibold text-purple-600">67%</span>
+                  <span className="font-semibold text-purple-600 capitalize">
+                    {profile?.type || 'Not set'}
+                  </span>
                 </div>
               </div>
             </Card>

@@ -27,13 +27,15 @@ const OnboardingPage: React.FC = () => {
     currency: 'NGN',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, login } = useAuth();
   const { updateProfile } = useBusiness();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setError(''); // Clear error when user starts typing
   };
 
   const handleNext = () => {
@@ -46,22 +48,40 @@ const OnboardingPage: React.FC = () => {
 
   const handleComplete = async () => {
     setIsLoading(true);
+    setError('');
+    
     try {
+      // Try to register new user
       await register(formData.email, formData.password, formData.name);
       
       // Create business profile
-      updateProfile({
-        id: 'business-1',
+      await updateProfile({
         name: formData.businessName,
         type: formData.businessType,
         currency: formData.currency,
         theme: 'light',
-        accentColor: 'primary'
+        accent_color: 'primary'
       });
 
       navigate('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration failed:', error);
+      setError(error.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      await login(formData.email, formData.password);
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      setError(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -86,6 +106,12 @@ const OnboardingPage: React.FC = () => {
                 Let's start by creating your account
               </p>
             </div>
+
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
@@ -126,6 +152,19 @@ const OnboardingPage: React.FC = () => {
                   placeholder="Create a strong password"
                 />
               </div>
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                Already have an account?{' '}
+                <button
+                  onClick={handleLogin}
+                  disabled={!formData.email || !formData.password || isLoading}
+                  className="text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  Sign in here
+                </button>
+              </p>
             </div>
           </motion.div>
         );

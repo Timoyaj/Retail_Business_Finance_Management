@@ -1,51 +1,24 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { localDB, BusinessProfile, Product, Transaction } from '../lib/database';
+import { useAuth } from './AuthContext';
 
-export interface Transaction {
-  id: string;
-  type: 'sale' | 'expense' | 'inventory';
-  amount: number;
-  description: string;
-  category: string;
-  paymentMethod?: string;
-  date: Date;
-  status: 'completed' | 'pending' | 'cancelled';
-}
-
-export interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  costPrice: number;
-  sellingPrice: number;
-  currentStock: number;
-  lowStockThreshold: number;
-  description?: string;
-}
-
-export interface BusinessProfile {
-  id: string;
-  name: string;
-  type: string;
-  currency: string;
-  theme: 'light' | 'dark';
-  accentColor: string;
-}
-
-interface BusinessContextType {
+export interface BusinessContextType {
   profile: BusinessProfile | null;
   transactions: Transaction[];
   products: Product[];
-  updateProfile: (profile: Partial<BusinessProfile>) => void;
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
-  addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (id: string, product: Partial<Product>) => void;
+  isLoading: boolean;
+  updateProfile: (profile: Partial<BusinessProfile>) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'business_id' | 'created_at'>) => Promise<void>;
+  addProduct: (product: Omit<Product, 'id' | 'business_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
   getFinancialSummary: () => {
     totalRevenue: number;
     totalExpenses: number;
     netProfit: number;
     inventoryValue: number;
   };
+  refreshData: () => Promise<void>;
 }
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
@@ -63,36 +36,116 @@ interface BusinessProviderProps {
 }
 
 export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) => {
+  const { user, isAuthenticated } = useAuth();
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const updateProfile = (newProfile: Partial<BusinessProfile>) => {
-    setProfile(prev => prev ? { ...prev, ...newProfile } : null);
+  // Load business data when user changes
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadBusinessData();
+    } else {
+      // Clear data when user logs out
+      setProfile(null);
+      setTransactions([]);
+      setProducts([]);
+    }
+  }, [isAuthenticated, user]);
+
+  const loadBusinessData = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      // Load business profile
+      const businessProfile = await localDB.getBusinessByUserId(user.id);
+      setProfile(businessProfile);
+
+      if (businessProfile) {
+        // Load transactions and products
+        const [businessTransactions, businessProducts] = await Promise.all([
+          localDB.getTransactionsByBusinessId(businessProfile.id),
+          localDB.getProductsByBusinessId(businessProfile.id),
+        ]);
+
+        setTransactions(businessTransactions);
+        setProducts(businessProducts);
+      }
+    } catch (error) {
+      console.error('Error loading business data:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
-    const newTransaction: Transaction = {
-      ...transaction,
-      id: Date.now().toString(),
-    };
+  const updateProfile = async (profileUpdate: Partial<BusinessProfile>) => {
+    if (!profile) {
+      // Create new business profile if it doesn't exist
+      if (!user) throw new Error('User not authenticated');
+      
+      const newProfile = await localDB.createBusiness({
+        user_id: user.id,
+        name: profileUpdate.name || 'My Business',
+        type: profileUpdate.type || 'general',
+        currency: profileUpdate.currency || 'NGN',
+        theme: profileUpdate.theme || 'light',
+        accent_color: profileUpdate.accent_color || 'primary',
+      });
+      
+      setProfile(newProfile);
+      
+      // Update user with business_id
+      await localDB.updateUser(user.id, { business_id: newProfile.id });
+    } else {
+      // Update existing profile
+      const updatedProfile = await localDB.updateBusiness(profile.id, profileUpdate);
+      setProfile(updatedProfile);
+    }
+  };
+
+  const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'business_id' | 'created_at'>) => {
+    if (!profile) throw new Error('Business profile not found');
+
+    const newTransaction = await localDB.createTransaction({
+      ...transactionData,
+      business_id: profile.id,
+    });
+
     setTransactions(prev => [newTransaction, ...prev]);
+
+    // Update product stock if it's a sale
+    if (transactionData.type === 'sale') {
+      // This is a simplified approach - in a real app, you'd track which products were sold
+      // For now, we'll just refresh the data
+      await refreshData();
+    }
   };
 
-  const addProduct = (product: Omit<Product, 'id'>) => {
-    const newProduct: Product = {
-      ...product,
-      id: Date.now().toString(),
-    };
+  const addProduct = async (productData: Omit<Product, 'id' | 'business_id' | 'created_at' | 'updated_at'>) => {
+    if (!profile) throw new Error('Business profile not found');
+
+    const newProduct = await localDB.createProduct({
+      ...productData,
+      business_id: profile.id,
+    });
+
     setProducts(prev => [...prev, newProduct]);
   };
 
-  const updateProduct = (id: string, productUpdate: Partial<Product>) => {
+  const updateProduct = async (id: string, productUpdate: Partial<Product>) => {
+    const updatedProduct = await localDB.updateProduct(id, productUpdate);
     setProducts(prev => 
       prev.map(product => 
-        product.id === id ? { ...product, ...productUpdate } : product
+        product.id === id ? updatedProduct : product
       )
     );
+  };
+
+  const deleteProduct = async (id: string) => {
+    await localDB.deleteProduct(id);
+    setProducts(prev => prev.filter(product => product.id !== id));
   };
 
   const getFinancialSummary = () => {
@@ -107,21 +160,28 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     const netProfit = totalRevenue - totalExpenses;
 
     const inventoryValue = products.reduce(
-      (sum, product) => sum + (product.currentStock * product.costPrice), 0
+      (sum, product) => sum + (product.current_stock * product.cost_price), 0
     );
 
     return { totalRevenue, totalExpenses, netProfit, inventoryValue };
+  };
+
+  const refreshData = async () => {
+    await loadBusinessData();
   };
 
   const value = {
     profile,
     transactions,
     products,
+    isLoading,
     updateProfile,
     addTransaction,
     addProduct,
     updateProduct,
+    deleteProduct,
     getFinancialSummary,
+    refreshData,
   };
 
   return <BusinessContext.Provider value={value}>{children}</BusinessContext.Provider>;
