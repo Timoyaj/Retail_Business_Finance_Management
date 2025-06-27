@@ -7,7 +7,7 @@ export interface BusinessContextType {
   transactions: Transaction[];
   products: Product[];
   isLoading: boolean;
-  updateProfile: (profile: Partial<BusinessProfile>) => Promise<void>;
+  updateProfile: (profile: Partial<BusinessProfile>, userId?: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'business_id' | 'created_at'>) => Promise<void>;
   addProduct: (product: Omit<Product, 'id' | 'business_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
@@ -80,13 +80,17 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     }
   };
 
-  const updateProfile = async (profileUpdate: Partial<BusinessProfile>) => {
+  const updateProfile = async (profileUpdate: Partial<BusinessProfile>, userId?: string) => {
+    const currentUserId = userId || user?.id;
+    
+    if (!currentUserId) {
+      throw new Error('User not authenticated');
+    }
+
     if (!profile) {
       // Create new business profile if it doesn't exist
-      if (!user) throw new Error('User not authenticated');
-      
       const newProfile = await localDB.createBusiness({
-        user_id: user.id,
+        user_id: currentUserId,
         name: profileUpdate.name || 'My Business',
         type: profileUpdate.type || 'general',
         currency: profileUpdate.currency || 'NGN',
@@ -97,7 +101,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
       setProfile(newProfile);
       
       // Update user with business_id
-      await localDB.updateUser(user.id, { business_id: newProfile.id });
+      await localDB.updateUser(currentUserId, { business_id: newProfile.id });
     } else {
       // Update existing profile
       const updatedProfile = await localDB.updateBusiness(profile.id, profileUpdate);

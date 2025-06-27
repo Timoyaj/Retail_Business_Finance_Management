@@ -51,17 +51,17 @@ const OnboardingPage: React.FC = () => {
     setError('');
     
     try {
-      // Try to register new user
-      await register(formData.email, formData.password, formData.name);
+      // Register new user and get the user object
+      const newUser = await register(formData.email, formData.password, formData.name);
       
-      // Create business profile
+      // Create business profile using the returned user ID
       await updateProfile({
         name: formData.businessName,
         type: formData.businessType,
         currency: formData.currency,
         theme: 'light',
         accent_color: 'primary'
-      });
+      }, newUser.id);
 
       navigate('/dashboard');
     } catch (error: any) {

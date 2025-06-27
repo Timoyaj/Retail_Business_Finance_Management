@@ -4,7 +4,7 @@ import { localDB, User } from '../lib/database';
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<User>;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (email: string, password: string, name: string): Promise<User> => {
     setIsLoading(true);
     try {
       // Simulate API call delay
@@ -83,6 +83,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       setUser(newUser);
       localDB.setCurrentUser(newUser);
+      
+      return newUser;
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
