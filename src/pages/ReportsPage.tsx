@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Download, Calendar, TrendingUp, DollarSign, Package } from 'lucide-react';
+import { FileText, Download, Calendar, TrendingUp, DollarSign, Package, BarChart3, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useBusiness } from '../contexts/BusinessContext';
 import Layout from '../components/Layout/Layout';
 import Card from '../components/UI/Card';
@@ -70,6 +71,25 @@ const ReportsPage: React.FC = () => {
     },
   ];
 
+  const reportTypes = [
+    {
+      title: 'Financial Statements',
+      description: 'Professional P&L, Balance Sheet, and Cash Flow statements',
+      icon: BarChart3,
+      color: 'from-blue-500 to-indigo-500',
+      link: '/financial-statements',
+      features: ['Profit & Loss Statement', 'Balance Sheet', 'Cash Flow Statement', 'Financial Ratios']
+    },
+    {
+      title: 'Chart of Accounts',
+      description: 'Manage your business accounting structure',
+      icon: FileText,
+      color: 'from-green-500 to-emerald-500',
+      link: '/accounts',
+      features: ['Account Management', 'Account Types', 'Account Balances', 'Account Hierarchy']
+    }
+  ];
+
   return (
     <Layout>
       <div className="p-8">
@@ -79,7 +99,7 @@ const ReportsPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Financial Reports</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Business Reports</h1>
             <p className="text-gray-600">Comprehensive insights into your business performance</p>
           </motion.div>
 
@@ -100,6 +120,51 @@ const ReportsPage: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* Professional Reports Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8"
+        >
+          <Card>
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Professional Financial Reports</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {reportTypes.map((report, index) => {
+                const Icon = report.icon;
+                return (
+                  <Link key={index} to={report.link}>
+                    <motion.div
+                      whileHover={{ y: -2, shadow: '0 10px 25px -3px rgba(0, 0, 0, 0.1)' }}
+                      className="p-6 border border-gray-200 rounded-xl hover:border-primary-300 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className={`w-12 h-12 bg-gradient-to-r ${report.color} rounded-xl flex items-center justify-center`}>
+                          <Icon className="h-6 w-6 text-white" />
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-gray-400" />
+                      </div>
+                      
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">{report.title}</h4>
+                      <p className="text-gray-600 mb-4">{report.description}</p>
+                      
+                      <div className="space-y-1">
+                        {report.features.map((feature, featureIndex) => (
+                          <div key={featureIndex} className="flex items-center text-sm text-gray-500">
+                            <div className="w-1.5 h-1.5 bg-primary-500 rounded-full mr-2" />
+                            {feature}
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </Link>
+                );
+              })}
+            </div>
+          </Card>
+        </motion.div>
 
         {/* Financial Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -315,33 +380,6 @@ const ReportsPage: React.FC = () => {
                 <Bar dataKey="profit" fill="#10b981" name="Profit" />
               </BarChart>
             </ResponsiveContainer>
-          </Card>
-        </motion.div>
-
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-          className="mt-8"
-        >
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">Quick Report Actions</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button variant="outline" className="justify-start">
-                <FileText className="mr-2 h-4 w-4" />
-                Generate P&L Statement
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <Calendar className="mr-2 h-4 w-4" />
-                Cash Flow Report
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <Package className="mr-2 h-4 w-4" />
-                Inventory Valuation
-              </Button>
-            </div>
           </Card>
         </motion.div>
       </div>

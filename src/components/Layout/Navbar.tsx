@@ -7,6 +7,7 @@ import {
   Package,
   FileText,
   Building,
+  BarChart3,
   Settings,
   LogOut,
   User
@@ -21,6 +22,7 @@ const navigationItems = [
   { name: 'Inventory', href: '/inventory', icon: Package },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Accounts', href: '/accounts', icon: Building },
+  { name: 'Financial Statements', href: '/financial-statements', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

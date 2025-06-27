@@ -10,6 +10,7 @@ import ExpensesPage from './pages/ExpensesPage';
 import InventoryPage from './pages/InventoryPage';
 import ReportsPage from './pages/ReportsPage';
 import AccountsPage from './pages/AccountsPage';
+import FinancialStatementsPage from './pages/FinancialStatementsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/accounts" element={<AccountsPage />} />
+              <Route path="/financial-statements" element={<FinancialStatementsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </div>
