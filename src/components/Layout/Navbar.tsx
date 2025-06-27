@@ -6,6 +6,7 @@ import {
   CreditCard,
   Package,
   Calculator,
+  Truck,
   FileText,
   Building,
   BarChart3,
@@ -22,7 +23,9 @@ const navigationItems = [
   { name: 'Expenses', href: '/expenses', icon: CreditCard },
   { name: 'Inventory', href: '/inventory', icon: Package },
   { name: 'Valuation', href: '/inventory-valuation', icon: Calculator },
-  { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Purchase Orders', href: '/purchase-orders', icon: FileText },
+  { name: 'Stock Receipts', href: '/stock-receipts', icon: Truck },
+  { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Accounts', href: '/accounts', icon: Building },
   { name: 'Financial Statements', href: '/financial-statements', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
@@ -46,7 +49,7 @@ const Navbar: React.FC = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;

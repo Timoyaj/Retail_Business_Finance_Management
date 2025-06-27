@@ -354,6 +354,204 @@ export interface Database {
           created_at?: string;
         };
       };
+      suppliers: {
+        Row: {
+          id: string;
+          business_id: string;
+          name: string;
+          contact_person: string | null;
+          email: string | null;
+          phone: string | null;
+          address: string | null;
+          payment_terms: string;
+          is_active: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          name: string;
+          contact_person?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          address?: string | null;
+          payment_terms?: string;
+          is_active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          name?: string;
+          contact_person?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          address?: string | null;
+          payment_terms?: string;
+          is_active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      purchase_orders: {
+        Row: {
+          id: string;
+          business_id: string;
+          supplier_id: string;
+          po_number: string;
+          status: 'draft' | 'sent' | 'confirmed' | 'partially_received' | 'received' | 'cancelled';
+          order_date: string;
+          expected_delivery_date: string | null;
+          subtotal: number;
+          tax_amount: number;
+          total_amount: number;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          supplier_id: string;
+          po_number: string;
+          status?: 'draft' | 'sent' | 'confirmed' | 'partially_received' | 'received' | 'cancelled';
+          order_date?: string;
+          expected_delivery_date?: string | null;
+          subtotal?: number;
+          tax_amount?: number;
+          total_amount?: number;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          supplier_id?: string;
+          po_number?: string;
+          status?: 'draft' | 'sent' | 'confirmed' | 'partially_received' | 'received' | 'cancelled';
+          order_date?: string;
+          expected_delivery_date?: string | null;
+          subtotal?: number;
+          tax_amount?: number;
+          total_amount?: number;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      purchase_order_items: {
+        Row: {
+          id: string;
+          purchase_order_id: string;
+          product_id: string;
+          quantity: number;
+          unit_cost: number;
+          total_cost: number;
+          quantity_received: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          purchase_order_id: string;
+          product_id: string;
+          quantity: number;
+          unit_cost: number;
+          total_cost: number;
+          quantity_received?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          purchase_order_id?: string;
+          product_id?: string;
+          quantity?: number;
+          unit_cost?: number;
+          total_cost?: number;
+          quantity_received?: number;
+          created_at?: string;
+        };
+      };
+      stock_receipts: {
+        Row: {
+          id: string;
+          business_id: string;
+          purchase_order_id: string | null;
+          receipt_number: string;
+          receipt_date: string;
+          received_by: string | null;
+          status: 'pending' | 'completed' | 'cancelled';
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          purchase_order_id?: string | null;
+          receipt_number: string;
+          receipt_date?: string;
+          received_by?: string | null;
+          status?: 'pending' | 'completed' | 'cancelled';
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          purchase_order_id?: string | null;
+          receipt_number?: string;
+          receipt_date?: string;
+          received_by?: string | null;
+          status?: 'pending' | 'completed' | 'cancelled';
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      stock_receipt_items: {
+        Row: {
+          id: string;
+          stock_receipt_id: string;
+          purchase_order_item_id: string | null;
+          product_id: string;
+          quantity_ordered: number;
+          quantity_received: number;
+          unit_cost: number;
+          total_cost: number;
+          variance_quantity: number;
+          variance_amount: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          stock_receipt_id: string;
+          purchase_order_item_id?: string | null;
+          product_id: string;
+          quantity_ordered?: number;
+          quantity_received: number;
+          unit_cost: number;
+          total_cost: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          stock_receipt_id?: string;
+          purchase_order_item_id?: string | null;
+          product_id?: string;
+          quantity_ordered?: number;
+          quantity_received?: number;
+          unit_cost?: number;
+          total_cost?: number;
+          created_at?: string;
+        };
+      };
     };
   };
 }

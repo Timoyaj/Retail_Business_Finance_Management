@@ -9,6 +9,8 @@ import SalesPage from './pages/SalesPage';
 import ExpensesPage from './pages/ExpensesPage';
 import InventoryPage from './pages/InventoryPage';
 import InventoryValuationPage from './pages/InventoryValuationPage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
+import StockReceiptsPage from './pages/StockReceiptsPage';
 import ReportsPage from './pages/ReportsPage';
 import AccountsPage from './pages/AccountsPage';
 import FinancialStatementsPage from './pages/FinancialStatementsPage';
@@ -28,6 +30,8 @@ function App() {
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/inventory-valuation" element={<InventoryValuationPage />} />
+              <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+              <Route path="/stock-receipts" element={<StockReceiptsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/financial-statements" element={<FinancialStatementsPage />} />
