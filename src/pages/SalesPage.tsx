@@ -8,7 +8,7 @@ import Button from '../components/UI/Button';
 import Badge from '../components/UI/Badge';
 
 const SalesPage: React.FC = () => {
-  const { transactions, products, addTransaction } = useBusiness();
+  const { transactions, products, addTransaction, isLoading } = useBusiness();
   const [showNewSaleModal, setShowNewSaleModal] = useState(false);
   const [saleForm, setSaleForm] = useState({
     productId: '',
@@ -17,34 +17,43 @@ const SalesPage: React.FC = () => {
     customerName: '',
     notes: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const salesTransactions = transactions.filter(t => t.type === 'sale');
 
-  const handleNewSale = () => {
+  const handleNewSale = async () => {
     const selectedProduct = products.find(p => p.id === saleForm.productId);
     if (!selectedProduct) return;
 
-    const saleAmount = selectedProduct.sellingPrice * saleForm.quantity;
+    setIsSubmitting(true);
+    try {
+      const saleAmount = selectedProduct.selling_price * saleForm.quantity;
 
-    addTransaction({
-      type: 'sale',
-      amount: saleAmount,
-      description: `${saleForm.quantity}x ${selectedProduct.name}`,
-      category: selectedProduct.category,
-      paymentMethod: saleForm.paymentMethod,
-      date: new Date(),
-      status: 'completed',
-    });
+      await addTransaction({
+        type: 'sale',
+        amount: saleAmount,
+        description: `${saleForm.quantity}x ${selectedProduct.name}`,
+        category: selectedProduct.category,
+        payment_method: saleForm.paymentMethod,
+        date: new Date().toISOString(),
+        status: 'completed',
+      });
 
-    // Reset form
-    setSaleForm({
-      productId: '',
-      quantity: 1,
-      paymentMethod: 'cash',
-      customerName: '',
-      notes: '',
-    });
-    setShowNewSaleModal(false);
+      // Reset form
+      setSaleForm({
+        productId: '',
+        quantity: 1,
+        paymentMethod: 'cash',
+        customerName: '',
+        notes: '',
+      });
+      setShowNewSaleModal(false);
+    } catch (error) {
+      console.error('Error creating sale:', error);
+      alert('Failed to create sale. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getPaymentMethodIcon = (method: string) => {
@@ -64,6 +73,19 @@ const SalesPage: React.FC = () => {
   const todaySales = salesTransactions
     .filter(t => new Date(t.date).toDateString() === new Date().toDateString())
     .reduce((sum, t) => sum + t.amount, 0);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="p-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading sales data...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -198,9 +220,9 @@ const SalesPage: React.FC = () => {
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2">
-                          {getPaymentMethodIcon(transaction.paymentMethod || 'cash')}
+                          {getPaymentMethodIcon(transaction.payment_method || 'cash')}
                           <span className="text-sm text-gray-600 capitalize">
-                            {transaction.paymentMethod || 'cash'}
+                            {transaction.payment_method || 'cash'}
                           </span>
                         </div>
                       </td>
@@ -254,7 +276,7 @@ const SalesPage: React.FC = () => {
                     <option value="">Select a product</option>
                     {products.map((product) => (
                       <option key={product.id} value={product.id}>
-                        {product.name} - ₦{product.sellingPrice.toLocaleString()}
+                        {product.name} - ₦{product.selling_price.toLocaleString()}
                       </option>
                     ))}
                   </select>
@@ -317,7 +339,7 @@ const SalesPage: React.FC = () => {
                 {saleForm.productId && (
                   <div className="bg-primary-50 p-4 rounded-lg">
                     <p className="text-sm font-medium text-primary-900">
-                      Sale Total: ₦{(products.find(p => p.id === saleForm.productId)?.sellingPrice || 0) * saleForm.quantity}
+                      Sale Total: ₦{(products.find(p => p.id === saleForm.productId)?.selling_price || 0) * saleForm.quantity}
                     </p>
                   </div>
                 )}
@@ -327,12 +349,14 @@ const SalesPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={() => setShowNewSaleModal(false)}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleNewSale}
-                  disabled={!saleForm.productId}
+                  disabled={!saleForm.productId || isSubmitting}
+                  isLoading={isSubmitting}
                 >
                   Record Sale
                 </Button>

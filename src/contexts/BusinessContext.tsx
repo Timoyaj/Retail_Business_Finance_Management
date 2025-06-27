@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { localDB, BusinessProfile, Product, Transaction } from '../lib/database';
+import { db, BusinessProfile, Product, Transaction } from '../lib/database';
 import { useAuth } from './AuthContext';
 
 export interface BusinessContextType {
@@ -60,14 +60,14 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     setIsLoading(true);
     try {
       // Load business profile
-      const businessProfile = await localDB.getBusinessByUserId(user.id);
+      const businessProfile = await db.getBusinessByUserId(user.id);
       setProfile(businessProfile);
 
       if (businessProfile) {
         // Load transactions and products
         const [businessTransactions, businessProducts] = await Promise.all([
-          localDB.getTransactionsByBusinessId(businessProfile.id),
-          localDB.getProductsByBusinessId(businessProfile.id),
+          db.getTransactionsByBusinessId(businessProfile.id),
+          db.getProductsByBusinessId(businessProfile.id),
         ]);
 
         setTransactions(businessTransactions);
@@ -89,7 +89,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
 
     if (!profile) {
       // Create new business profile if it doesn't exist
-      const newProfile = await localDB.createBusiness({
+      const newProfile = await db.createBusiness({
         user_id: currentUserId,
         name: profileUpdate.name || 'My Business',
         type: profileUpdate.type || 'general',
@@ -100,11 +100,14 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
       
       setProfile(newProfile);
       
-      // Update user with business_id
-      await localDB.updateUser(currentUserId, { business_id: newProfile.id });
+      // Initialize sample data for new business
+      await db.initializeSampleData(newProfile.id);
+      
+      // Refresh data to show sample data
+      await refreshData();
     } else {
       // Update existing profile
-      const updatedProfile = await localDB.updateBusiness(profile.id, profileUpdate);
+      const updatedProfile = await db.updateBusiness(profile.id, profileUpdate);
       setProfile(updatedProfile);
     }
   };
@@ -112,7 +115,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
   const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'business_id' | 'created_at'>) => {
     if (!profile) throw new Error('Business profile not found');
 
-    const newTransaction = await localDB.createTransaction({
+    const newTransaction = await db.createTransaction({
       ...transactionData,
       business_id: profile.id,
     });
@@ -130,7 +133,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
   const addProduct = async (productData: Omit<Product, 'id' | 'business_id' | 'created_at' | 'updated_at'>) => {
     if (!profile) throw new Error('Business profile not found');
 
-    const newProduct = await localDB.createProduct({
+    const newProduct = await db.createProduct({
       ...productData,
       business_id: profile.id,
     });
@@ -139,7 +142,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
   };
 
   const updateProduct = async (id: string, productUpdate: Partial<Product>) => {
-    const updatedProduct = await localDB.updateProduct(id, productUpdate);
+    const updatedProduct = await db.updateProduct(id, productUpdate);
     setProducts(prev => 
       prev.map(product => 
         product.id === id ? updatedProduct : product
@@ -148,7 +151,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
   };
 
   const deleteProduct = async (id: string) => {
-    await localDB.deleteProduct(id);
+    await db.deleteProduct(id);
     setProducts(prev => prev.filter(product => product.id !== id));
   };
 

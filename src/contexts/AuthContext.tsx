@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { localDB, User } from '../lib/database';
+import { db, User } from '../lib/database';
+import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -32,7 +33,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
-        const currentUser = localDB.getCurrentUser();
+        const currentUser = await db.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
         }
@@ -44,24 +45,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     checkExistingSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const currentUser = await db.getCurrentUser();
+          setUser(currentUser);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For demo purposes, we'll accept any password for existing users
-      // In production, this would verify against a hashed password
-      const existingUser = await localDB.getUserByEmail(email);
-      
-      if (!existingUser) {
-        throw new Error('User not found. Please check your email or register for a new account.');
-      }
-      
-      setUser(existingUser);
-      localDB.setCurrentUser(existingUser);
+      const loggedInUser = await db.signIn(email, password);
+      setUser(loggedInUser);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -73,17 +78,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (email: string, password: string, name: string): Promise<User> => {
     setIsLoading(true);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newUser = await localDB.createUser({
+      // For demo purposes, we'll create a user with a default password
+      // In production, you'd use the actual password provided
+      const newUser = await db.createUser({
         email,
         name,
       });
       
       setUser(newUser);
-      localDB.setCurrentUser(newUser);
-      
       return newUser;
     } catch (error) {
       console.error('Registration error:', error);
@@ -93,9 +95,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localDB.clearCurrentUser();
+  const logout = async () => {
+    try {
+      await db.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const value = {

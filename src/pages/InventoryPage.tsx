@@ -8,43 +8,52 @@ import Button from '../components/UI/Button';
 import Badge from '../components/UI/Badge';
 
 const InventoryPage: React.FC = () => {
-  const { products, addProduct, updateProduct } = useBusiness();
+  const { products, addProduct, updateProduct, deleteProduct, isLoading } = useBusiness();
   const [showNewProductModal, setShowNewProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [productForm, setProductForm] = useState({
     name: '',
     sku: '',
     category: 'clothing',
-    costPrice: '',
-    sellingPrice: '',
-    currentStock: '',
-    lowStockThreshold: '10',
+    cost_price: '',
+    selling_price: '',
+    current_stock: '',
+    low_stock_threshold: '10',
     description: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = ['clothing', 'electronics', 'accessories', 'shoes', 'bags', 'other'];
 
-  const handleSaveProduct = () => {
-    if (!productForm.name || !productForm.sku || !productForm.costPrice || !productForm.sellingPrice) return;
+  const handleSaveProduct = async () => {
+    if (!productForm.name || !productForm.sku || !productForm.cost_price || !productForm.selling_price) return;
 
-    const productData = {
-      name: productForm.name,
-      sku: productForm.sku,
-      category: productForm.category,
-      costPrice: parseFloat(productForm.costPrice),
-      sellingPrice: parseFloat(productForm.sellingPrice),
-      currentStock: parseInt(productForm.currentStock) || 0,
-      lowStockThreshold: parseInt(productForm.lowStockThreshold) || 10,
-      description: productForm.description,
-    };
+    setIsSubmitting(true);
+    try {
+      const productData = {
+        name: productForm.name,
+        sku: productForm.sku,
+        category: productForm.category,
+        cost_price: parseFloat(productForm.cost_price),
+        selling_price: parseFloat(productForm.selling_price),
+        current_stock: parseInt(productForm.current_stock) || 0,
+        low_stock_threshold: parseInt(productForm.low_stock_threshold) || 10,
+        description: productForm.description,
+      };
 
-    if (editingProduct) {
-      updateProduct(editingProduct, productData);
-    } else {
-      addProduct(productData);
+      if (editingProduct) {
+        await updateProduct(editingProduct, productData);
+      } else {
+        await addProduct(productData);
+      }
+
+      resetForm();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      alert('Failed to save product. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    resetForm();
   };
 
   const resetForm = () => {
@@ -52,10 +61,10 @@ const InventoryPage: React.FC = () => {
       name: '',
       sku: '',
       category: 'clothing',
-      costPrice: '',
-      sellingPrice: '',
-      currentStock: '',
-      lowStockThreshold: '10',
+      cost_price: '',
+      selling_price: '',
+      current_stock: '',
+      low_stock_threshold: '10',
       description: '',
     });
     setShowNewProductModal(false);
@@ -67,19 +76,43 @@ const InventoryPage: React.FC = () => {
       name: product.name,
       sku: product.sku,
       category: product.category,
-      costPrice: product.costPrice.toString(),
-      sellingPrice: product.sellingPrice.toString(),
-      currentStock: product.currentStock.toString(),
-      lowStockThreshold: product.lowStockThreshold.toString(),
+      cost_price: product.cost_price.toString(),
+      selling_price: product.selling_price.toString(),
+      current_stock: product.current_stock.toString(),
+      low_stock_threshold: product.low_stock_threshold.toString(),
       description: product.description || '',
     });
     setEditingProduct(product.id);
     setShowNewProductModal(true);
   };
 
-  const lowStockProducts = products.filter(p => p.currentStock <= p.lowStockThreshold);
-  const totalInventoryValue = products.reduce((sum, p) => sum + (p.currentStock * p.costPrice), 0);
+  const handleDeleteProduct = async (productId: string) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+      try {
+        await deleteProduct(productId);
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        alert('Failed to delete product. Please try again.');
+      }
+    }
+  };
+
+  const lowStockProducts = products.filter(p => p.current_stock <= p.low_stock_threshold);
+  const totalInventoryValue = products.reduce((sum, p) => sum + (p.current_stock * p.cost_price), 0);
   const totalProducts = products.length;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="p-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading inventory data...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -183,12 +216,12 @@ const InventoryPage: React.FC = () => {
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-gray-900">{product.name}</h4>
                       <Badge variant="warning" size="sm">
-                        {product.currentStock} left
+                        {product.current_stock} left
                       </Badge>
                     </div>
                     <p className="text-sm text-gray-600 mb-1">SKU: {product.sku}</p>
                     <p className="text-xs text-amber-700">
-                      Reorder threshold: {product.lowStockThreshold} units
+                      Reorder threshold: {product.low_stock_threshold} units
                     </p>
                   </div>
                 ))}
@@ -252,21 +285,21 @@ const InventoryPage: React.FC = () => {
                         </Badge>
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-600">
-                        ₦{product.costPrice.toLocaleString()}
+                        ₦{product.cost_price.toLocaleString()}
                       </td>
                       <td className="py-4 px-4 font-semibold text-green-600">
-                        ₦{product.sellingPrice.toLocaleString()}
+                        ₦{product.selling_price.toLocaleString()}
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2">
                           <span className={`font-medium ${
-                            product.currentStock <= product.lowStockThreshold 
+                            product.current_stock <= product.low_stock_threshold 
                               ? 'text-red-600' 
                               : 'text-gray-900'
                           }`}>
-                            {product.currentStock}
+                            {product.current_stock}
                           </span>
-                          {product.currentStock <= product.lowStockThreshold && (
+                          {product.current_stock <= product.low_stock_threshold && (
                             <AlertTriangle className="h-4 w-4 text-amber-500" />
                           )}
                         </div>
@@ -279,7 +312,10 @@ const InventoryPage: React.FC = () => {
                           >
                             <Edit3 className="h-4 w-4" />
                           </button>
-                          <button className="p-1 text-gray-400 hover:text-red-600">
+                          <button 
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="p-1 text-gray-400 hover:text-red-600"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -362,8 +398,8 @@ const InventoryPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={productForm.costPrice}
-                    onChange={(e) => setProductForm({ ...productForm, costPrice: e.target.value })}
+                    value={productForm.cost_price}
+                    onChange={(e) => setProductForm({ ...productForm, cost_price: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="0.00"
                   />
@@ -375,8 +411,8 @@ const InventoryPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={productForm.sellingPrice}
-                    onChange={(e) => setProductForm({ ...productForm, sellingPrice: e.target.value })}
+                    value={productForm.selling_price}
+                    onChange={(e) => setProductForm({ ...productForm, selling_price: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="0.00"
                   />
@@ -388,8 +424,8 @@ const InventoryPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={productForm.currentStock}
-                    onChange={(e) => setProductForm({ ...productForm, currentStock: e.target.value })}
+                    value={productForm.current_stock}
+                    onChange={(e) => setProductForm({ ...productForm, current_stock: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="0"
                   />
@@ -401,8 +437,8 @@ const InventoryPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={productForm.lowStockThreshold}
-                    onChange={(e) => setProductForm({ ...productForm, lowStockThreshold: e.target.value })}
+                    value={productForm.low_stock_threshold}
+                    onChange={(e) => setProductForm({ ...productForm, low_stock_threshold: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="10"
                   />
@@ -422,11 +458,11 @@ const InventoryPage: React.FC = () => {
                 </div>
               </div>
 
-              {productForm.costPrice && productForm.sellingPrice && (
+              {productForm.cost_price && productForm.selling_price && (
                 <div className="mt-4 p-4 bg-primary-50 rounded-lg">
                   <p className="text-sm font-medium text-primary-900">
-                    Profit Margin: ₦{(parseFloat(productForm.sellingPrice) - parseFloat(productForm.costPrice)).toLocaleString()} 
-                    ({(((parseFloat(productForm.sellingPrice) - parseFloat(productForm.costPrice)) / parseFloat(productForm.sellingPrice)) * 100).toFixed(1)}%)
+                    Profit Margin: ₦{(parseFloat(productForm.selling_price) - parseFloat(productForm.cost_price)).toLocaleString()} 
+                    ({(((parseFloat(productForm.selling_price) - parseFloat(productForm.cost_price)) / parseFloat(productForm.selling_price)) * 100).toFixed(1)}%)
                   </p>
                 </div>
               )}
@@ -435,12 +471,14 @@ const InventoryPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={resetForm}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSaveProduct}
-                  disabled={!productForm.name || !productForm.sku || !productForm.costPrice || !productForm.sellingPrice}
+                  disabled={!productForm.name || !productForm.sku || !productForm.cost_price || !productForm.selling_price || isSubmitting}
+                  isLoading={isSubmitting}
                 >
                   {editingProduct ? 'Update Product' : 'Add Product'}
                 </Button>

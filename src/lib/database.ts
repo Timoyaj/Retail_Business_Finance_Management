@@ -1,306 +1,339 @@
-// Local Development Database
-// This simulates a real database for development and demonstration
-// Can be easily replaced with Supabase when ready for production
+import { supabase } from './supabase';
+import type { Database } from './supabase';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  created_at: string;
-  business_id?: string;
-}
+// Type aliases for easier use
+export type User = Database['public']['Tables']['profiles']['Row'];
+export type BusinessProfile = Database['public']['Tables']['business_profiles']['Row'];
+export type Product = Database['public']['Tables']['products']['Row'];
+export type Transaction = Database['public']['Tables']['transactions']['Row'];
+export type Category = Database['public']['Tables']['categories']['Row'];
 
-export interface BusinessProfile {
-  id: string;
-  user_id: string;
-  name: string;
-  type: string;
-  currency: string;
-  theme: 'light' | 'dark';
-  accent_color: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Product {
-  id: string;
-  business_id: string;
-  name: string;
-  sku: string;
-  category: string;
-  cost_price: number;
-  selling_price: number;
-  current_stock: number;
-  low_stock_threshold: number;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Transaction {
-  id: string;
-  business_id: string;
-  type: 'sale' | 'expense' | 'inventory';
-  amount: number;
-  description: string;
-  category: string;
-  payment_method?: string;
-  date: string;
-  status: 'completed' | 'pending' | 'cancelled';
-  created_at: string;
-}
-
-// Local storage keys
-const STORAGE_KEYS = {
-  USERS: 'ledgerloom_users',
-  BUSINESSES: 'ledgerloom_businesses',
-  PRODUCTS: 'ledgerloom_products',
-  TRANSACTIONS: 'ledgerloom_transactions',
-  CURRENT_USER: 'ledgerloom_current_user',
-} as const;
-
-// Utility functions for local storage
-class LocalDatabase {
-  private getFromStorage<T>(key: string): T[] {
-    try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error(`Error reading from localStorage key ${key}:`, error);
-      return [];
-    }
-  }
-
-  private saveToStorage<T>(key: string, data: T[]): void {
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (error) {
-      console.error(`Error saving to localStorage key ${key}:`, error);
-    }
-  }
-
-  private generateId(): string {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  }
-
+// Database service class
+class DatabaseService {
   // User operations
-  async createUser(userData: Omit<User, 'id' | 'created_at'>): Promise<User> {
-    const users = this.getFromStorage<User>(STORAGE_KEYS.USERS);
-    
-    // Check if user already exists
-    const existingUser = users.find(u => u.email === userData.email);
-    if (existingUser) {
-      throw new Error('User already exists with this email');
+  async createUser(userData: { email: string; name: string }): Promise<User> {
+    const { data, error } = await supabase.auth.signUp({
+      email: userData.email,
+      password: 'temp-password-123', // In production, this would be the actual password
+      options: {
+        data: {
+          name: userData.name,
+        },
+      },
+    });
+
+    if (error) {
+      if (error.message.includes('already registered')) {
+        throw new Error('User already exists with this email');
+      }
+      throw new Error(error.message);
     }
 
-    const newUser: User = {
-      ...userData,
-      id: this.generateId(),
-      created_at: new Date().toISOString(),
-    };
+    if (!data.user) {
+      throw new Error('Failed to create user');
+    }
 
-    users.push(newUser);
-    this.saveToStorage(STORAGE_KEYS.USERS, users);
-    
-    return newUser;
+    // Get the created profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError) {
+      throw new Error('Failed to retrieve user profile');
+    }
+
+    return profile;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
-    const users = this.getFromStorage<User>(STORAGE_KEYS.USERS);
-    return users.find(u => u.email === email) || null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // No user found
+      }
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async updateUser(userId: string, updates: Partial<User>): Promise<User> {
-    const users = this.getFromStorage<User>(STORAGE_KEYS.USERS);
-    const userIndex = users.findIndex(u => u.id === userId);
-    
-    if (userIndex === -1) {
-      throw new Error('User not found');
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
     }
 
-    users[userIndex] = { ...users[userIndex], ...updates };
-    this.saveToStorage(STORAGE_KEYS.USERS, users);
+    return data;
+  }
+
+  async getCurrentUser(): Promise<User | null> {
+    const { data: { user } } = await supabase.auth.getUser();
     
-    return users[userIndex];
+    if (!user) {
+      return null;
+    }
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+
+    return profile;
+  }
+
+  // Authentication operations
+  async signIn(email: string, password: string): Promise<User> {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data.user) {
+      throw new Error('Failed to sign in');
+    }
+
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError) {
+      throw new Error('Failed to retrieve user profile');
+    }
+
+    return profile;
+  }
+
+  async signOut(): Promise<void> {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      throw new Error(error.message);
+    }
   }
 
   // Business operations
-  async createBusiness(businessData: Omit<BusinessProfile, 'id' | 'created_at' | 'updated_at'>): Promise<BusinessProfile> {
-    const businesses = this.getFromStorage<BusinessProfile>(STORAGE_KEYS.BUSINESSES);
-    
-    const newBusiness: BusinessProfile = {
-      ...businessData,
-      id: this.generateId(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+  async createBusiness(businessData: Database['public']['Tables']['business_profiles']['Insert']): Promise<BusinessProfile> {
+    const { data, error } = await supabase
+      .from('business_profiles')
+      .insert(businessData)
+      .select()
+      .single();
 
-    businesses.push(newBusiness);
-    this.saveToStorage(STORAGE_KEYS.BUSINESSES, businesses);
-    
-    return newBusiness;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async getBusinessByUserId(userId: string): Promise<BusinessProfile | null> {
-    const businesses = this.getFromStorage<BusinessProfile>(STORAGE_KEYS.BUSINESSES);
-    return businesses.find(b => b.user_id === userId) || null;
-  }
+    const { data, error } = await supabase
+      .from('business_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
 
-  async updateBusiness(businessId: string, updates: Partial<BusinessProfile>): Promise<BusinessProfile> {
-    const businesses = this.getFromStorage<BusinessProfile>(STORAGE_KEYS.BUSINESSES);
-    const businessIndex = businesses.findIndex(b => b.id === businessId);
-    
-    if (businessIndex === -1) {
-      throw new Error('Business not found');
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // No business found
+      }
+      throw new Error(error.message);
     }
 
-    businesses[businessIndex] = { 
-      ...businesses[businessIndex], 
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
-    this.saveToStorage(STORAGE_KEYS.BUSINESSES, businesses);
-    
-    return businesses[businessIndex];
+    return data;
+  }
+
+  async updateBusiness(businessId: string, updates: Database['public']['Tables']['business_profiles']['Update']): Promise<BusinessProfile> {
+    const { data, error } = await supabase
+      .from('business_profiles')
+      .update(updates)
+      .eq('id', businessId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   // Product operations
-  async createProduct(productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product> {
-    const products = this.getFromStorage<Product>(STORAGE_KEYS.PRODUCTS);
-    
-    const newProduct: Product = {
-      ...productData,
-      id: this.generateId(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+  async createProduct(productData: Database['public']['Tables']['products']['Insert']): Promise<Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .insert(productData)
+      .select()
+      .single();
 
-    products.push(newProduct);
-    this.saveToStorage(STORAGE_KEYS.PRODUCTS, products);
-    
-    return newProduct;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async getProductsByBusinessId(businessId: string): Promise<Product[]> {
-    const products = this.getFromStorage<Product>(STORAGE_KEYS.PRODUCTS);
-    return products.filter(p => p.business_id === businessId);
-  }
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false });
 
-  async updateProduct(productId: string, updates: Partial<Product>): Promise<Product> {
-    const products = this.getFromStorage<Product>(STORAGE_KEYS.PRODUCTS);
-    const productIndex = products.findIndex(p => p.id === productId);
-    
-    if (productIndex === -1) {
-      throw new Error('Product not found');
+    if (error) {
+      throw new Error(error.message);
     }
 
-    products[productIndex] = { 
-      ...products[productIndex], 
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
-    this.saveToStorage(STORAGE_KEYS.PRODUCTS, products);
-    
-    return products[productIndex];
+    return data || [];
+  }
+
+  async updateProduct(productId: string, updates: Database['public']['Tables']['products']['Update']): Promise<Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .update(updates)
+      .eq('id', productId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async deleteProduct(productId: string): Promise<void> {
-    const products = this.getFromStorage<Product>(STORAGE_KEYS.PRODUCTS);
-    const filteredProducts = products.filter(p => p.id !== productId);
-    this.saveToStorage(STORAGE_KEYS.PRODUCTS, filteredProducts);
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
   }
 
   // Transaction operations
-  async createTransaction(transactionData: Omit<Transaction, 'id' | 'created_at'>): Promise<Transaction> {
-    const transactions = this.getFromStorage<Transaction>(STORAGE_KEYS.TRANSACTIONS);
-    
-    const newTransaction: Transaction = {
-      ...transactionData,
-      id: this.generateId(),
-      created_at: new Date().toISOString(),
-    };
+  async createTransaction(transactionData: Database['public']['Tables']['transactions']['Insert']): Promise<Transaction> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(transactionData)
+      .select()
+      .single();
 
-    transactions.push(newTransaction);
-    this.saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
-    
-    return newTransaction;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async getTransactionsByBusinessId(businessId: string): Promise<Transaction[]> {
-    const transactions = this.getFromStorage<Transaction>(STORAGE_KEYS.TRANSACTIONS);
-    return transactions.filter(t => t.business_id === businessId).sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-  }
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false });
 
-  async updateTransaction(transactionId: string, updates: Partial<Transaction>): Promise<Transaction> {
-    const transactions = this.getFromStorage<Transaction>(STORAGE_KEYS.TRANSACTIONS);
-    const transactionIndex = transactions.findIndex(t => t.id === transactionId);
-    
-    if (transactionIndex === -1) {
-      throw new Error('Transaction not found');
+    if (error) {
+      throw new Error(error.message);
     }
 
-    transactions[transactionIndex] = { ...transactions[transactionIndex], ...updates };
-    this.saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
-    
-    return transactions[transactionIndex];
+    return data || [];
+  }
+
+  async updateTransaction(transactionId: string, updates: Database['public']['Tables']['transactions']['Update']): Promise<Transaction> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(updates)
+      .eq('id', transactionId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async deleteTransaction(transactionId: string): Promise<void> {
-    const transactions = this.getFromStorage<Transaction>(STORAGE_KEYS.TRANSACTIONS);
-    const filteredTransactions = transactions.filter(t => t.id !== transactionId);
-    this.saveToStorage(STORAGE_KEYS.TRANSACTIONS, filteredTransactions);
-  }
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', transactionId);
 
-  // Session management
-  setCurrentUser(user: User): void {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-  }
-
-  getCurrentUser(): User | null {
-    try {
-      const userData = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      return userData ? JSON.parse(userData) : null;
-    } catch (error) {
-      console.error('Error getting current user:', error);
-      return null;
+    if (error) {
+      throw new Error(error.message);
     }
   }
 
-  clearCurrentUser(): void {
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  // Category operations
+  async createCategory(categoryData: Database['public']['Tables']['categories']['Insert']): Promise<Category> {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert(categoryData)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
-  // Initialize with sample data
-  async initializeSampleData(): Promise<void> {
-    const users = this.getFromStorage<User>(STORAGE_KEYS.USERS);
-    
-    // Only initialize if no data exists
-    if (users.length === 0) {
-      // Create sample user
-      const sampleUser = await this.createUser({
-        email: 'demo@ledgerloom.com',
-        name: 'Demo User',
-      });
+  async getCategoriesByBusinessId(businessId: string, type?: 'product' | 'expense' | 'income'): Promise<Category[]> {
+    let query = supabase
+      .from('categories')
+      .select('*')
+      .eq('business_id', businessId);
 
-      // Create sample business
-      const sampleBusiness = await this.createBusiness({
-        user_id: sampleUser.id,
-        name: 'Demo Fashion Boutique',
-        type: 'boutique',
-        currency: 'NGN',
-        theme: 'light',
-        accent_color: 'primary',
-      });
+    if (type) {
+      query = query.eq('type', type);
+    }
 
-      // Update user with business_id
-      await this.updateUser(sampleUser.id, { business_id: sampleBusiness.id });
+    const { data, error } = await query.order('name');
 
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  }
+
+  // Initialize sample data for new businesses
+  async initializeSampleData(businessId: string): Promise<void> {
+    try {
       // Create sample products
       const sampleProducts = [
         {
-          business_id: sampleBusiness.id,
+          business_id: businessId,
           name: 'Cotton T-Shirt',
           sku: 'TS001',
           category: 'clothing',
@@ -311,7 +344,7 @@ class LocalDatabase {
           description: 'Comfortable cotton t-shirt in various colors',
         },
         {
-          business_id: sampleBusiness.id,
+          business_id: businessId,
           name: 'Denim Jeans',
           sku: 'DJ001',
           category: 'clothing',
@@ -322,7 +355,7 @@ class LocalDatabase {
           description: 'Premium denim jeans',
         },
         {
-          business_id: sampleBusiness.id,
+          business_id: businessId,
           name: 'Leather Handbag',
           sku: 'LH001',
           category: 'accessories',
@@ -341,7 +374,7 @@ class LocalDatabase {
       // Create sample transactions
       const sampleTransactions = [
         {
-          business_id: sampleBusiness.id,
+          business_id: businessId,
           type: 'sale' as const,
           amount: 15000,
           description: 'T-shirt sales',
@@ -351,7 +384,7 @@ class LocalDatabase {
           status: 'completed' as const,
         },
         {
-          business_id: sampleBusiness.id,
+          business_id: businessId,
           type: 'sale' as const,
           amount: 25000,
           description: 'Jeans and accessories',
@@ -361,7 +394,7 @@ class LocalDatabase {
           status: 'completed' as const,
         },
         {
-          business_id: sampleBusiness.id,
+          business_id: businessId,
           type: 'expense' as const,
           amount: 5000,
           description: 'Electricity bill',
@@ -370,7 +403,7 @@ class LocalDatabase {
           status: 'completed' as const,
         },
         {
-          business_id: sampleBusiness.id,
+          business_id: businessId,
           type: 'expense' as const,
           amount: 50000,
           description: 'Monthly rent',
@@ -383,19 +416,25 @@ class LocalDatabase {
       for (const transaction of sampleTransactions) {
         await this.createTransaction(transaction);
       }
-    }
-  }
 
-  // Clear all data (for testing)
-  clearAllData(): void {
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
-    });
+      // Create sample categories
+      const sampleCategories = [
+        { business_id: businessId, name: 'Clothing', type: 'product' as const, color: '#3b82f6' },
+        { business_id: businessId, name: 'Accessories', type: 'product' as const, color: '#10b981' },
+        { business_id: businessId, name: 'Utilities', type: 'expense' as const, color: '#f59e0b' },
+        { business_id: businessId, name: 'Rent', type: 'expense' as const, color: '#ef4444' },
+        { business_id: businessId, name: 'Marketing', type: 'expense' as const, color: '#8b5cf6' },
+      ];
+
+      for (const category of sampleCategories) {
+        await this.createCategory(category);
+      }
+    } catch (error) {
+      console.error('Error initializing sample data:', error);
+      // Don't throw error here as it's not critical for the app to function
+    }
   }
 }
 
 // Export singleton instance
-export const localDB = new LocalDatabase();
-
-// Initialize sample data on first load
-localDB.initializeSampleData().catch(console.error);
+export const db = new DatabaseService();

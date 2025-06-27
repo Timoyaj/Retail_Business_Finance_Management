@@ -8,7 +8,7 @@ import Button from '../components/UI/Button';
 import Badge from '../components/UI/Badge';
 
 const ExpensesPage: React.FC = () => {
-  const { transactions, addTransaction } = useBusiness();
+  const { transactions, addTransaction, isLoading } = useBusiness();
   const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
@@ -17,6 +17,7 @@ const ExpensesPage: React.FC = () => {
     vendor: '',
     notes: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const expenseCategories = [
     'utilities',
@@ -32,27 +33,35 @@ const ExpensesPage: React.FC = () => {
 
   const expenseTransactions = transactions.filter(t => t.type === 'expense');
 
-  const handleNewExpense = () => {
+  const handleNewExpense = async () => {
     if (!expenseForm.amount || !expenseForm.description) return;
 
-    addTransaction({
-      type: 'expense',
-      amount: parseFloat(expenseForm.amount),
-      description: expenseForm.description,
-      category: expenseForm.category,
-      date: new Date(),
-      status: 'completed',
-    });
+    setIsSubmitting(true);
+    try {
+      await addTransaction({
+        type: 'expense',
+        amount: parseFloat(expenseForm.amount),
+        description: expenseForm.description,
+        category: expenseForm.category,
+        date: new Date().toISOString(),
+        status: 'completed',
+      });
 
-    // Reset form
-    setExpenseForm({
-      amount: '',
-      description: '',
-      category: 'utilities',
-      vendor: '',
-      notes: '',
-    });
-    setShowNewExpenseModal(false);
+      // Reset form
+      setExpenseForm({
+        amount: '',
+        description: '',
+        category: 'utilities',
+        vendor: '',
+        notes: '',
+      });
+      setShowNewExpenseModal(false);
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      alert('Failed to create expense. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const totalExpenses = expenseTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -67,6 +76,19 @@ const ExpensesPage: React.FC = () => {
       .reduce((sum, t) => sum + t.amount, 0),
     count: expenseTransactions.filter(t => t.category === category).length
   })).filter(item => item.total > 0);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="p-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading expenses data...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -344,12 +366,14 @@ const ExpensesPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={() => setShowNewExpenseModal(false)}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleNewExpense}
-                  disabled={!expenseForm.amount || !expenseForm.description}
+                  disabled={!expenseForm.amount || !expenseForm.description || isSubmitting}
+                  isLoading={isSubmitting}
                 >
                   Record Expense
                 </Button>
