@@ -66,7 +66,21 @@ const OnboardingPage: React.FC = () => {
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Registration failed:', error);
-      setError(error.message || 'Registration failed. Please try again.');
+      
+      // Check if the error is due to user already existing
+      if (error.message && error.message.toLowerCase().includes('user already exists')) {
+        try {
+          // Attempt to log in with the provided credentials
+          await login(formData.email, formData.password);
+          navigate('/dashboard');
+          return; // Exit early on successful login
+        } catch (loginError: any) {
+          console.error('Login attempt failed:', loginError);
+          setError('User already exists. Please check your password and try signing in instead.');
+        }
+      } else {
+        setError(error.message || 'Registration failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
